@@ -66,6 +66,10 @@ module DPL
         options[:env] || context.env['ELASTIC_BEANSTALK_ENV'] || raise(Error, "missing env")
       end
 
+      def force_update
+        options[:force_update]
+      end
+
       def version_label
         context.env['ELASTIC_BEANSTALK_LABEL'] || "travis-#{sha}-#{Time.now.to_i}"
       end
@@ -183,11 +187,31 @@ module DPL
         if errorEvents > 0 then error("Deployment failed.") end
       end
 
+      def abort_update()
+        options = {
+          :environment_name  => env_name
+        }
+
+        begin
+          eb.abort_environment_update(options)
+        rescue; end
+
+        options[:attribute_names] = ["Status"]
+        while eb.describe_environment_health(options).status != "Ready"
+          sleep 5
+        end
+      end
+
       def update_app(version)
         options = {
           :environment_name  => env_name,
           :version_label     => version[:application_version][:version_label]
         }
+
+        if force_update
+          abort_update()
+        end
+
         eb.update_environment(options)
       end
     end
